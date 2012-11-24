@@ -10,7 +10,7 @@
     "expect.js": "*"
   },
   "scripts" : {
-    "test" : "mocha --compilers coffee:coffee-script test"
+    "test" : "mocha"
   }
 }
 	

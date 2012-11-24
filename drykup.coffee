@@ -33,7 +33,7 @@ elements =
  fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup
  html i iframe ins kbd label legend li map mark menu meter nav noscript object
  ol optgroup option output p pre progress q rp rt ruby s samp script section
- select small span strong sub summary sup table tbody td textarea tfoot
+ select small span strong style sub summary sup table tbody td textarea tfoot
  th thead time title tr u ul video'
 
   # Valid self-closing HTML 5 elements.
@@ -58,81 +58,122 @@ merge_elements = (args...) ->
 # -------------------------------- main drykup code ------------------------------
 
 class Drykup 
-	constructor: (opts = {}) -> 
-		@indent  = opts.indent  ? ''
-		@htmlOut = opts.htmlOut ? ''
-		@expand  = opts.expand  ? false
-		
-	resetHtml: (html = '') -> @htmlOut = html
-	
-	defineGlobalTagFuncs: -> if window then for name, func of @ then window[name] = func
-	
-	addText: (s) -> if s then @htmlOut += @indent + s + '\n'; ''
-	
-	attrStr: (obj) ->
-		attrstr = ''
-		for name, val of obj
-			if @expand and name is 'x' then attrstr += @attrStr expandAttrs val
-			else 
-				vstr = val.toString()
-				q = (if vstr.indexOf('"') isnt -1 then "'" else '"')
-				attrstr += ' ' + name + '=' + q +  vstr + q
-		attrstr
+  constructor: (opts = {}) -> 
+    @indent  = opts.indent  ? ''
+    @htmlOut = opts.htmlOut ? ''
+    @expand  = opts.expand  ? false
+    
+  resetHtml: (html = '') -> @htmlOut = html
+  
+  defineGlobalTagFuncs: -> if window then for name, func of @ then window[name] = func
+  
+  addText: (s) -> 
+    if s 
+      @htmlOut += @indent + s + '\n'
+  
+  quote: (value) ->
+    q = (if '"' in value then "'" else '"')
+    return q + value + q
 
-	normalTag: (tagName, args) ->
-		attrstr = innertext = ''
-		func = null
-		for arg in args
-			switch typeof arg
-				when 'undefined','null' then continue
-				when 'string', 'number' then innertext = arg
-				when 'function' 		then func = arg
-				when 'object'   		then attrstr += @attrStr arg
-				else console.log 'DryKup: invalid argument, tag ' + tagName + ', ' + arg.toString()
-		@htmlOut += @indent + '<' + tagName + attrstr + '>'
-		if func and tagName isnt 'textarea'
-			@htmlOut += '\n'
-			@indent += '  '
-			@addText innertext
-			func?()
-			@indent = @indent[0..-3]
-			@addText '</' + tagName + '>'
-		else 
-			@htmlOut += innertext + '</' + tagName + '>' + '\n'
+  renderAttr: (name, value) -> 
+    " #{name}=#{@quote value.toString()}"
 
-	selfClosingTag: (tagName, args) ->
-		attrstr = ''
-		for arg in args
-			if not arg? then continue
-			if typeof arg is 'object' then attrstr += @attrStr arg
-			else console.log 'DryKup: invalid argument, tag ' + tagName + ', ' + arg.toString()
-		@addText '<' + tagName + attrstr + ' />' + '\n'
+  ATTR_ORDER: ['id', 'class']
+  renderAttrs: (obj) -> 
+    result = ''
+    
+    # render explicitly ordered attributes first
+    for name in @ATTR_ORDER when name of obj
+      result += @renderAttr name, obj[name]
+      delete obj[name]
 
-	styleFunc: (str) ->
-		if typeof str isnt 'string'
-#			console.log 'DryKup: invalid argument, tag style, ' + str.toString()
-			return
-		@addText '<style>' + (if @expand then expandStyle str else str)+'\n' + @indent + '</style>'
+    # then unordered attrs 
+    for name, value of obj
+      result += @renderAttr name, value
+
+    return result
+
+  isSelector: (string) ->
+    string.length > 1 and string[0] in ['#', '.']  
+
+  parseSelector: (selector) ->
+    id = null
+    classes = []
+    for token in selector.split '.'
+      if id
+        classes.push token
+      else
+        [klass, id] = token.split '#'
+        classes.push token unless klass is ''
+    return {id, classes}
+  
+  normalizeArgs: (args) ->
+    attrs = {}
+    selector = null
+    contentFunc = null
+    text = ''
+    for arg, index in args
+      switch typeof arg
+        when 'string'
+          if index is 0 and @isSelector(arg)
+            selector = @parseSelector(arg)
+          else
+            text = arg
+        when 'function'
+          contentFunc = arg
+        when 'object'
+          attrs = arg
+        when 'number', 'boolean'
+          text = arg.toString()
+        else  
+          console.log "DryKup: invalid argument: #{arg.toString()}"
+
+    if selector?
+      {id, classes} = selector
+      attrs.id = id if id?
+      attrs.class = classes.join(' ') if classes?.length
+
+    return {attrs, text, contentFunc}
+
+  normalTag: (tag, args) ->
+    {attrs, text, contentFunc} = @normalizeArgs args
+
+    @htmlOut += "#{@indent}<#{tag}#{@renderAttrs attrs}>"
+    if contentFunc and tag isnt 'textarea'
+      @htmlOut += '\n'
+      @indent += '  '
+      @addText text
+      contentFunc.call @
+      @indent = @indent[0..-3]
+      @addText "</#{tag}>"
+    else 
+      @htmlOut += "#{text}</#{tag}>\n"
+
+  selfClosingTag: (tag, args) ->
+    {attrs, text, contentFunc} = @normalizeArgs args
+    if text or contentFunc?
+      throw new Error "DryKup: <#{tag}/> must not have content.  Attempted to nest #{contentFunc or text}"
+
+    @addText "<#{tag}#{@renderAttrs attrs} />"
 
 drykup = (opts) -> 
-	dk = new Drykup(opts)
-	
-	dk.doctype 		= (type) -> dk.addText doctypes[type]
-	dk.text    		=    (s) -> dk.addText s
-	dk.coffeescript =   	 -> dk.addText 'coffeescript tag not implemented'
-	dk.style 		=    (s) -> dk.styleFunc s
-	
-	for tagName in merge_elements 'regular', 'obsolete'
-		do (tagName) ->
-			dk[tagName] = (args...) -> dk.normalTag tagName, args
-			
-	for tagName in merge_elements 'void', 'obsolete_void'
-		do (tagName) ->
-        	dk[tagName] = (args...) -> dk.selfClosingTag tagName, args
-	dk
-	
+  dk = new Drykup(opts)
+  
+  dk.doctype    = (type) -> dk.addText doctypes[type]
+  dk.text       =    (s) -> dk.addText s
+  dk.coffeescript =      -> dk.addText 'coffeescript tag not implemented'
+  
+  for tagName in merge_elements 'regular', 'obsolete'
+    do (tagName) ->
+      dk[tagName] = (args...) -> dk.normalTag tagName, args
+      
+  for tagName in merge_elements 'void', 'obsolete_void'
+    do (tagName) ->
+          dk[tagName] = (args...) -> dk.selfClosingTag tagName, args
+  dk
+  
 if module?.exports
-	module.exports = drykup
+  module.exports = drykup
 else 
-	window.drykup = drykup
-	
+  window.drykup = drykup
+  
