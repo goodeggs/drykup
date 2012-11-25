@@ -67,25 +67,21 @@ class DryKup
 
     # can't use class => notation.  The binding happens before our missing 'new' shortcircuit
     # TODO: switch back to => methods once factory functionality is removed
-    for method in 'coffeescript text doctype render'.split(' ') 
+    for method in 'coffeescript comment doctype escape render text'.split(' ') 
       do (method) =>
         @[method] = (args...) => DryKup::[method].apply @, args
 
     for tagName in merge_elements 'regular', 'obsolete'
       do (tagName) =>
-        @[tagName] = (args...) => @normalTag tagName, args
+        @[tagName] = (args...) => @tag tagName, args...
         
     for tagName in merge_elements 'void', 'obsolete_void'
       do (tagName) =>
-        @[tagName] = (args...) => @selfClosingTag tagName, args
+        @[tagName] = (args...) => @selfClosingTag tagName, args...
     
   resetHtml: (html = '') -> @htmlOut = html
   
   defineGlobalTagFuncs: -> if window then for name, func of @ then window[name] = func
-  
-  addText: (s) -> 
-    if s 
-      @htmlOut += @indent + s + '\n'
   
   quote: (value) ->
     q = (if '"' in value then "'" else '"')
@@ -100,12 +96,12 @@ class DryKup
 
     return " #{name}=#{@quote value.toString()}"
 
-  ATTR_ORDER: ['id', 'class']
+  attrOrder: ['id', 'class']
   renderAttrs: (obj) -> 
     result = ''
     
     # render explicitly ordered attributes first
-    for name in @ATTR_ORDER when name of obj
+    for name in @attrOrder when name of obj
       result += @renderAttr name, obj[name]
       delete obj[name]
 
@@ -114,6 +110,17 @@ class DryKup
       result += @renderAttr name, value
 
     return result
+
+  renderContents: (contents) ->
+    if not contents?
+      return
+    else if typeof contents is 'function'
+      @htmlOut += '\n'
+      @indent += '  '
+      contents.call @
+      @indent = @indent[0..-3]
+    else
+      @htmlOut += contents.toString()
 
   isSelector: (string) ->
     string.length > 1 and string[0] in ['#', '.']  
@@ -132,21 +139,18 @@ class DryKup
   normalizeArgs: (args) ->
     attrs = {}
     selector = null
-    contentFunc = null
-    text = ''
+    contents = null
     for arg, index in args
       switch typeof arg
         when 'string'
           if index is 0 and @isSelector(arg)
             selector = @parseSelector(arg)
           else
-            text = arg
-        when 'function'
-          contentFunc = arg
+            contents = arg
+        when 'function', 'number', 'boolean'
+          contents = arg
         when 'object'
           attrs = arg
-        when 'number', 'boolean'
-          text = arg.toString()
         else  
           console.log "DryKup: invalid argument: #{arg.toString()}"
 
@@ -155,28 +159,20 @@ class DryKup
       attrs.id = id if id?
       attrs.class = classes.join(' ') if classes?.length
 
-    return {attrs, text, contentFunc}
+    return {attrs, contents}
 
-  normalTag: (tag, args) ->
-    {attrs, text, contentFunc} = @normalizeArgs args
+  tag: (tagName, args...) ->
+    {attrs, contents} = @normalizeArgs args
 
-    @htmlOut += "#{@indent}<#{tag}#{@renderAttrs attrs}>"
-    if contentFunc and tag isnt 'textarea'
-      @htmlOut += '\n'
-      @indent += '  '
-      @addText text
-      contentFunc.call @
-      @indent = @indent[0..-3]
-      @addText "</#{tag}>"
-    else 
-      @htmlOut += "#{text}</#{tag}>\n"
+    @htmlOut += "#{@indent}<#{tagName}#{@renderAttrs attrs}>"
+    @renderContents contents
+    @text "</#{tagName}>"
 
-  selfClosingTag: (tag, args) ->
-    {attrs, text, contentFunc} = @normalizeArgs args
-    if text or contentFunc?
-      throw new Error "DryKup: <#{tag}/> must not have content.  Attempted to nest #{contentFunc or text}"
-
-    @addText "<#{tag}#{@renderAttrs attrs} />"
+  selfClosingTag: (tag, args...) ->
+    {attrs, contents} = @normalizeArgs args
+    if contents
+      throw new Error "DryKup: <#{tag}/> must not have content.  Attempted to nest #{content}"
+    @text "<#{tag}#{@renderAttrs attrs} />"
 
   render: (template, data) ->
     oldOut = @htmlOut
@@ -190,14 +186,30 @@ class DryKup
     drykup = new DryKup options
     return drykup.render template, data
 
-  doctype: (type) ->
-    @addText doctypes[type]
-
-  text: (s) ->
-    @addText s
-
   coffeescript: ->
     throw new Error 'DryKup: coffeescript tag not implemented'
+
+  comment: (text) ->
+    @text "<!--#{text}-->"
+
+  doctype: (type=5) ->
+    @text doctypes[type]
+
+  escape: (text) ->
+    text.toString().replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  ie: (condition, contents) ->
+    @htmlOut += "#{@indent}<!--[if #{condition}]>"
+    @renderContents contents
+    @text "<![endif]-->"
+
+  text: (s) ->
+    if s 
+      @htmlOut += @indent + s + '\n'
 
 if module?.exports
   module.exports = DryKup

@@ -25,9 +25,9 @@ describe 'coffeekup.org example', ->
           header, nav, section, footer {display: block}
         '''
         script src: '/javascripts/jquery.js'
-        coffeescript ->
-          $ ->
-            alert 'Alerts are so annoying...'
+        # coffeescript ->
+        #   $ ->
+        #     alert 'Alerts are so annoying...'
       body ->
         header ->
           h1 x.title or 'Untitled'
