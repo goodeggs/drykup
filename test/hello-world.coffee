@@ -7,4 +7,4 @@ describe 'hello world', ->
     	title 'Hello World'
     body ->
 
-    expect(drykup.htmlOut).to.contain '<title>Hello World  </title>'
+    expect(drykup.htmlOut).to.contain '<title>Hello World</title>'

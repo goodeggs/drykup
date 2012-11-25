@@ -61,7 +61,6 @@ class DryKup
     unless @ instanceof DryKup
       return new DryKup opts
 
-    @indent  = opts.indent  ? ''
     @htmlOut = opts.htmlOut ? ''
     @expand  = opts.expand  ? false
 
@@ -115,10 +114,7 @@ class DryKup
     if not contents?
       return
     else if typeof contents is 'function'
-      @htmlOut += '\n'
-      @indent += '  '
       contents.call @
-      @indent = @indent[0..-3]
     else
       @htmlOut += contents.toString()
 
@@ -164,7 +160,7 @@ class DryKup
   tag: (tagName, args...) ->
     {attrs, contents} = @normalizeArgs args
 
-    @htmlOut += "#{@indent}<#{tagName}#{@renderAttrs attrs}>"
+    @text "<#{tagName}#{@renderAttrs attrs}>"
     @renderContents contents
     @text "</#{tagName}>"
 
@@ -203,13 +199,13 @@ class DryKup
       .replace(/'/g, '&#39;')
 
   ie: (condition, contents) ->
-    @htmlOut += "#{@indent}<!--[if #{condition}]>"
+    @text "<!--[if #{condition}]>"
     @renderContents contents
     @text "<![endif]-->"
 
   text: (s) ->
     if s 
-      @htmlOut += @indent + s + '\n'
+      @htmlOut += s
 
 if module?.exports
   module.exports = DryKup

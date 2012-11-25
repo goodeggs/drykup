@@ -10,11 +10,11 @@ describe 'render', ->
       template = ({name}) -> @div name
 
     it 'returns the rendered HTML string', ->
-      expect(DryKup.render template, data).to.equal '<div>foo</div>\n'
+      expect(DryKup.render template, data).to.equal '<div>foo</div>'
 
   describe 'nested in a template', ->
     it 'renders the nested template without clobbering the parent result', ->
       template = -> 
         {p, render, strong, a} = @
         p "This text could use #{render -> strong -> a href: '/', 'a link'}."
-      expect(DryKup.render template).to.equal '<p>This text could use <strong>\n  <a href="/">a link  </a>\n</strong>\n.</p>\n'
+      expect(DryKup.render template).to.equal '<p>This text could use <strong><a href="/">a link</a></strong>.</p>'
