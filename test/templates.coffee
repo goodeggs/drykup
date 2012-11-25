@@ -14,7 +14,7 @@ describe 'Template convention candidates', ->
     beforeEach -> 
       drykup = new DryKup()
 
-    it 'works', ->
+    it 'works without gratuitous function binding', ->
       render ({user}) ->
         @div '.header', ->
           @a href: '/logout', 'Log out'
@@ -25,7 +25,7 @@ describe 'Template convention candidates', ->
   describe 'destructuring assignment', ->
     beforeEach -> 
       drykup = new DryKup()
-      
+
     it 'works', ->
       render ({user}) ->
         {div, a, p} = @

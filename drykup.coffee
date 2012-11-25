@@ -203,6 +203,9 @@ class DryKup
     @renderContents contents
     @text "<![endif]-->"
 
+  include: (template, data) ->
+    template.call @, data
+
   text: (s) ->
     if s 
       @htmlOut += s
