@@ -55,13 +55,11 @@ merge_elements = (args...) ->
   result
 
 
-# -------------------------------- main drykup code ------------------------------
-
-class Drykup 
+class DryKup 
   constructor: (opts = {}) ->
     # check if called without new for backwards compatibility
-    unless @ instanceof Drykup
-      return new Drykup opts
+    unless @ instanceof DryKup
+      return new DryKup opts
 
     @indent  = opts.indent  ? ''
     @htmlOut = opts.htmlOut ? ''
@@ -71,7 +69,7 @@ class Drykup
     # TODO: switch back to => methods once factory functionality is removed
     for method in 'coffeescript text doctype render'.split(' ') 
       do (method) =>
-        @[method] = (args...) => Drykup::[method].apply @, args
+        @[method] = (args...) => DryKup::[method].apply @, args
 
     for tagName in merge_elements 'regular', 'obsolete'
       do (tagName) =>
@@ -189,7 +187,7 @@ class Drykup
     return result
 
   @render: (template, data, options) ->
-    drykup = new Drykup options
+    drykup = new DryKup options
     return drykup.render template, data
 
   doctype: (type) ->
@@ -202,7 +200,7 @@ class Drykup
     throw new Error 'DryKup: coffeescript tag not implemented'
 
 if module?.exports
-  module.exports = Drykup
+  module.exports = DryKup
 else 
-  window.drykup = Drykup
+  window.drykup = DryKup
   

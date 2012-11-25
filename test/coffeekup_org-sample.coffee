@@ -1,8 +1,8 @@
 expect = require 'expect.js'
-Drykup = require('../drykup')
+DryKup = require('../drykup')
 
 {doctype, html, head, meta, link, style, title, script, body,
-coffeescript, header, section, nav, footer, h1, h2, ul, li, a, p} = drykup = Drykup()
+coffeescript, header, section, nav, footer, h1, h2, ul, li, a, p} = drykup = DryKup()
 
 describe 'coffeekup.org example', ->
 
