@@ -58,10 +58,28 @@ merge_elements = (args...) ->
 # -------------------------------- main drykup code ------------------------------
 
 class Drykup 
-  constructor: (opts = {}) -> 
+  constructor: (opts = {}) ->
+    # check if called without new for backwards compatibility
+    unless @ instanceof Drykup
+      return new Drykup opts
+
     @indent  = opts.indent  ? ''
     @htmlOut = opts.htmlOut ? ''
     @expand  = opts.expand  ? false
+
+    # can't use class => notation.  The binding happens before our missing 'new' shortcircuit
+    # TODO: switch back to => methods once factory functionality is removed
+    for method in 'coffeescript text doctype'.split(' ') 
+      do (method) =>
+        @[method] = (args...) => Drykup::[method].apply @, args
+
+    for tagName in merge_elements 'regular', 'obsolete'
+      do (tagName) =>
+        @[tagName] = (args...) => @normalTag tagName, args
+        
+    for tagName in merge_elements 'void', 'obsolete_void'
+      do (tagName) =>
+        @[tagName] = (args...) => @selfClosingTag tagName, args
     
   resetHtml: (html = '') -> @htmlOut = html
   
@@ -76,7 +94,13 @@ class Drykup
     return q + value + q
 
   renderAttr: (name, value) -> 
-    " #{name}=#{@quote value.toString()}"
+    if not value? or value is false
+      return ''
+    
+    if value is true
+      value = name
+
+    return " #{name}=#{@quote value.toString()}"
 
   ATTR_ORDER: ['id', 'class']
   renderAttrs: (obj) -> 
@@ -156,24 +180,17 @@ class Drykup
 
     @addText "<#{tag}#{@renderAttrs attrs} />"
 
-drykup = (opts) -> 
-  dk = new Drykup(opts)
-  
-  dk.doctype    = (type) -> dk.addText doctypes[type]
-  dk.text       =    (s) -> dk.addText s
-  dk.coffeescript =      -> dk.addText 'coffeescript tag not implemented'
-  
-  for tagName in merge_elements 'regular', 'obsolete'
-    do (tagName) ->
-      dk[tagName] = (args...) -> dk.normalTag tagName, args
-      
-  for tagName in merge_elements 'void', 'obsolete_void'
-    do (tagName) ->
-          dk[tagName] = (args...) -> dk.selfClosingTag tagName, args
-  dk
-  
+  doctype: (type) ->
+    @addText doctypes[type]
+
+  text: (s) ->
+    @addText s
+
+  coffeescript: ->
+    throw new Error 'DryKup: coffeescript tag not implemented'
+
 if module?.exports
-  module.exports = drykup
+  module.exports = Drykup
 else 
-  window.drykup = drykup
+  window.drykup = Drykup
   
