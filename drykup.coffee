@@ -69,7 +69,7 @@ class Drykup
 
     # can't use class => notation.  The binding happens before our missing 'new' shortcircuit
     # TODO: switch back to => methods once factory functionality is removed
-    for method in 'coffeescript text doctype'.split(' ') 
+    for method in 'coffeescript text doctype render'.split(' ') 
       do (method) =>
         @[method] = (args...) => Drykup::[method].apply @, args
 
@@ -179,6 +179,18 @@ class Drykup
       throw new Error "DryKup: <#{tag}/> must not have content.  Attempted to nest #{contentFunc or text}"
 
     @addText "<#{tag}#{@renderAttrs attrs} />"
+
+  render: (template, data) ->
+    oldOut = @htmlOut
+    @resetHtml()
+    template.call @, data
+    result = @htmlOut
+    @resetHtml(oldOut)
+    return result
+
+  @render: (template, data, options) ->
+    drykup = new Drykup options
+    return drykup.render template, data
 
   doctype: (type) ->
     @addText doctypes[type]
