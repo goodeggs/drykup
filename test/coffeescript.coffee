@@ -1,10 +1,10 @@
 expect = require 'expect.js'
-DryKup = require '../drykup'
+{coffeescript} = require '../tags'
 
 describe 'coffeescript', ->
   it 'is not implemented', ->
-    template = -> @coffeescript -> alert 'hi'
-    expect(-> DryKup.render template).to.throwException /coffeescript tag not implemented/
+    template = -> coffeescript -> alert 'hi'
+    expect(-> template()).to.throwException /coffeescript tag not implemented/
 
   # it 'function should render', ->
   #   t = -> coffeescript -> alert 'hi'

@@ -1,10 +1,11 @@
 expect = require 'expect.js'
-{head, title, body} = drykup = require('../drykup')()
+{fragment, head, title, body} = require '../tags'
 
 describe 'hello world', ->
   it 'renders am html string from drykup tag functions', ->
-    head ->                     
-    	title 'Hello World'
-    body ->
+    template = fragment ->
+      head ->                     
+      	title 'Hello World'
+      body ->
 
-    expect(drykup.htmlOut).to.contain '<title>Hello World</title>'
+    expect(template()).to.contain '<title>Hello World</title>'

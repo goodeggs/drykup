@@ -57,31 +57,26 @@ merge_elements = (args...) ->
 
 class DryKup 
   constructor: ->
-    # check if called without new for backwards compatibility
-    unless @ instanceof DryKup
-      return new DryKup()
-
-    # can't use class => notation.  The binding happens before our missing 'new' shortcircuit
-    # TODO: switch back to => methods once factory functionality is removed
-    for method in 'coffeescript comment doctype escape render text'.split(' ') 
-      do (method) =>
-        @[method] = (args...) => DryKup::[method].apply @, args
-
-    for tagName in merge_elements 'regular', 'obsolete'
-      do (tagName) =>
-        @[tagName] = (args...) => @tag tagName, args...
-        
-    for tagName in merge_elements 'void', 'obsolete_void'
-      do (tagName) =>
-        @[tagName] = (args...) => @selfClosingTag tagName, args...
+    @htmlOut = null
     
-  resetHtml: (html = '') -> @htmlOut = html
+  resetBuffer: (html = null) -> 
+    previous = @htmlOut
+    @htmlOut = html
+    return previous
   
-  defineGlobalTagFuncs: -> if window then for name, func of @ then window[name] = func
-  
-  quote: (value) ->
-    q = (if '"' in value then "'" else '"')
-    return q + value + q
+  ensureBuffer: (template) ->
+    if @htmlOut is null
+      @htmlOut = ''
+      template()
+      return @resetBuffer()
+    else
+      template()
+
+  stashBuffer: (template) ->
+    previous = @resetBuffer()
+    result = template()
+    @resetBuffer(previous)
+    return result
 
   renderAttr: (name, value) -> 
     if not value? or value is false
@@ -156,10 +151,10 @@ class DryKup
 
   tag: (tagName, args...) ->
     {attrs, contents} = @normalizeArgs args
-
-    @text "<#{tagName}#{@renderAttrs attrs}>"
-    @renderContents contents
-    @text "</#{tagName}>"
+    @ensureBuffer =>
+      @text "<#{tagName}#{@renderAttrs attrs}>"
+      @renderContents contents
+      @text "</#{tagName}>"
 
   selfClosingTag: (tag, args...) ->
     {attrs, contents} = @normalizeArgs args
@@ -167,17 +162,13 @@ class DryKup
       throw new Error "DryKup: <#{tag}/> must not have content.  Attempted to nest #{content}"
     @text "<#{tag}#{@renderAttrs attrs} />"
 
-  render: (template, data) ->
-    oldOut = @htmlOut
-    @resetHtml()
-    template.call @, data
-    result = @htmlOut
-    @resetHtml(oldOut)
-    return result
-
-  @render: (template, data) ->
-    drykup = new DryKup()
-    return drykup.render template, data
+  # Wraps a function to collect all nested tag calls
+  # while maintaining context and arguments
+  fragment: (template) ->
+    drykup = @
+    return (args...) ->
+      drykup.ensureBuffer =>
+        template.apply @, args
 
   coffeescript: ->
     throw new Error 'DryKup: coffeescript tag not implemented'
@@ -188,6 +179,25 @@ class DryKup
   doctype: (type=5) ->
     @text doctypes[type]
 
+  ie: (condition, contents) ->
+    @ensureBuffer =>
+      @text "<!--[if #{condition}]>"
+      @renderContents contents
+      @text "<![endif]-->"
+
+  text: (s) ->
+    @ensureBuffer =>
+      if s 
+        @htmlOut += s
+
+  #
+  # Filters
+  # return strings instead of appending to buffer
+  #
+  cede: (template, args...) ->
+    @stashBuffer ->
+      template(args...)
+
   escape: (text) ->
     text.toString().replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -195,17 +205,28 @@ class DryKup
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;')
 
-  ie: (condition, contents) ->
-    @text "<!--[if #{condition}]>"
-    @renderContents contents
-    @text "<![endif]-->"
+  quote: (value) ->
+    q = (if '"' in value then "'" else '"')
+    return q + value + q
 
-  include: (template, data) ->
-    template.call @, data
+  #
+  # Binding
+  #
+  tags: ->
+    bound = {}
+    for method in 'cede coffeescript comment doctype escape fragment ie tag text'.split(' ') 
+      do (method) =>
+        bound[method] = (args...) => @[method].apply @, args
 
-  text: (s) ->
-    if s 
-      @htmlOut += s
+    for tagName in merge_elements 'regular', 'obsolete'
+      do (tagName) =>
+        bound[tagName] = (args...) => @tag tagName, args...
+        
+    for tagName in merge_elements 'void', 'obsolete_void'
+      do (tagName) =>
+        bound[tagName] = (args...) => @selfClosingTag tagName, args...
+
+    return bound
 
 if module?.exports
   module.exports = DryKup

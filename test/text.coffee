@@ -1,7 +1,6 @@
 expect = require 'expect.js'
-DryKup = require '../drykup'
+{text} = require '../tags'
 
 describe 'text', ->
   it 'renders text verbatim', ->
-    template = -> @text 'foobar'
-    expect(DryKup.render template).to.equal 'foobar'
+    expect(text 'foobar').to.equal 'foobar'

@@ -1,9 +1,9 @@
 expect = require 'expect.js'
-DryKup = require '../drykup'
+{ie, link} = require '../tags'
 
 describe 'IE conditionals', ->
   it 'renders conditional comments', ->
     template = -> 
-      @ie 'gte IE8', -> 
-        @link href: 'ie.css', rel: 'stylesheet'
-    expect(DryKup.render template).to.equal '<!--[if gte IE8]><link href="ie.css" rel="stylesheet" /><![endif]-->'
+      ie 'gte IE8', -> 
+        link href: 'ie.css', rel: 'stylesheet'
+    expect(template()).to.equal '<!--[if gte IE8]><link href="ie.css" rel="stylesheet" /><![endif]-->'

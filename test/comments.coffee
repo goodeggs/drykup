@@ -1,7 +1,7 @@
 expect = require 'expect.js'
-DryKup = require '../drykup'
+{comment} = require '../tags'
 
 describe 'Comments', ->
   it 'renders HTML <!--comments-->', ->
-    template = -> @comment "Comment"
-    expect(DryKup.render template).to.equal '<!--Comment-->'
+    template = -> comment "Comment"
+    expect(template()).to.equal '<!--Comment-->'
