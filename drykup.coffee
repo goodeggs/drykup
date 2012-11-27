@@ -56,13 +56,10 @@ merge_elements = (args...) ->
 
 
 class DryKup 
-  constructor: (opts = {}) ->
+  constructor: ->
     # check if called without new for backwards compatibility
     unless @ instanceof DryKup
-      return new DryKup opts
-
-    @htmlOut = opts.htmlOut ? ''
-    @expand  = opts.expand  ? false
+      return new DryKup()
 
     # can't use class => notation.  The binding happens before our missing 'new' shortcircuit
     # TODO: switch back to => methods once factory functionality is removed
@@ -178,8 +175,8 @@ class DryKup
     @resetHtml(oldOut)
     return result
 
-  @render: (template, data, options) ->
-    drykup = new DryKup options
+  @render: (template, data) ->
+    drykup = new DryKup()
     return drykup.render template, data
 
   coffeescript: ->
