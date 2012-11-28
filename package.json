@@ -3,6 +3,14 @@
 	"version": "0.1.2",
 	"author": "Mark Hahn <mark@hahnca.com>",
 	"main":"bin/drykup.js",
-	"description": "A coffeekup-compatible template (dsl) for coffeeScript.  Needs no compile."
+  "description": "A coffeekup-compatible template (dsl) for coffeeScript.  Needs no compile.",
+  "devDependencies": {
+    "coffee-script": "*",
+    "mocha": "*",
+    "expect.js": "*"
+  },
+  "scripts" : {
+    "test" : "mocha"
+  }
 }
 	

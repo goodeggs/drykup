@@ -33,7 +33,7 @@ elements =
  fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup
  html i iframe ins kbd label legend li map mark menu meter nav noscript object
  ol optgroup option output p pre progress q rp rt ruby s samp script section
- select small span strong sub summary sup table tbody td textarea tfoot
+ select small span strong style sub summary sup table tbody td textarea tfoot
  th thead time title tr u ul video'
 
   # Valid self-closing HTML 5 elements.
@@ -54,191 +54,180 @@ merge_elements = (args...) ->
       result.push element unless element in result
   result
 
-# ------------------- constants for shorthand aliases -------------------------
-attrAliases  = 
-	w:'width', h:'height', s:'src', src:'src', hr:'href', href:'href', c:'class', db:'data-bind'
-	i:'id', n:'name', v:'value', m:'method', t:'type'
-	cp:'cellpadding', b:'border', cs:'colspan', rs:'rowspan', chk:'checked', sel:'selected'
 
-styleValueAliases =
-	'm:a':'margin:auto', 'ml:a':'margin-left:auto',  'mt:a':'margin-top:auto'
-	'mr:a':'margin-right:auto',  'mb:a':'margin-bottom:auto' 
-	'c:b':'clear:both', 'f:l':'float:left', 'f:r':'float:right', 'f:n':'float:none'
-	'fw:b':'font-weight:bold', 'fw:n':'font-weight:normal'
-	'fs:i':'font-style:italic', 'fs:n':'font-style:normal'
-	'p:a':'position:absolute', 'p:r':'position:relative', 'p:f':'position:fixed'
-	'd:n':'display:none', 'd:b':'display:block', 'd:f':'display:fixed'
-	'ta:l':'text-align:left', 'ta:c':'text-align:center', 'ta:r':'text-align:right'
-	'o:a':'overflow:auto', 'o:h':'overflow:hidden'
-	'c:a':'cursor:auto', 'c:p':'cursor:pointer'
-	'tt:u':'text-transform:uppercase', 'tt:c':'text-transform:capitalize' 
-	'tt:l':'text-transform:lowercase'
-	'td:n':'text-decoration:none', 'td:u':'text-decoration:underline' 
-	'td:lt':'text-decoration: line-through', 'lh:n':'line-height:normal'
-	'b:n': 'border:none'
-	'b:1pxsb' :'border:1px solid black'
-	'bl:1pxsb':'border-left:1px solid black',  'bt:1pxsb':'border-top:1px solid black'
-	'br:1pxsb':'border-right:1px solid black', 'bb:1pxsb':'border-bottom:1px solid black'
-	'b:1pxsg' :'border:1px solid gray'    
-	'bl:1pxsg':'border-left:1px solid gray',  'bt:1pxsg':'border-top:1px solid gray'
-	'br:1pxsg':'border-right:1px solid gray', 'bb:1pxsg':'border-bottom:1px solid gray'
-	'zi:a':'z-index:auto', 'zi:i':'z-index:inherit'
-	'v:v':'visibility:visible', 'v:h':'visibility:hidden'
+class DryKup 
+  constructor: ->
+    @htmlOut = null
+    
+  resetBuffer: (html=null) -> 
+    previous = @htmlOut
+    @htmlOut = html
+    return previous
 
-styleAliases = 
-	l:'left', t:'top', r:'right', w:'width', h:'height', c:'color', bc:'background-color', bot:'bottom'
-	fs:'font-size', lh:'line-height', zi:'z-index'
-	b:'border', bl:'border-left', bt:'border-top', br:'border-right', bb:'border-bottom'
-	m:'margin', ml:'margin-left', mt:'margin-top', mr:'margin-right', mb:'margin-bottom'
-	p:'padding', pl:'padding-left', pt:'padding-top', pr:'padding-right', pb:'padding-bottom'
-	v:'visibility', ff:'font-family'
+  render: (template, args...) ->
+    previous = @resetBuffer('')
+    try
+      template(args...)
+    finally
+      result = @resetBuffer previous
+    return result
 
-# ---------------------------- alias shorthand expansion code ---------------------------------
-whiteSpace = (str) ->
-	str.replace(/([^~])\+/g, '$1 ').replace(/~\+/g, '+')
+  # alias render for coffeecup compatibility
+  cede: (args...) -> @render(args...)
+  
+  # Template function decorator to render the argument template
+  # to a string when it's called outside any other template
+  renderable: (template) ->
+    drykup = @
+    return (args...) ->
+      if drykup.htmlOut is null
+        drykup.htmlOut = ''
+        try
+          template.apply @, args
+        finally
+          result = drykup.resetBuffer()
+        return result
+      else
+        template.apply @, args
 
-expandAttrs = (v = '', styleOnly = false) -> 
-	attrs = {}; styles = {}
-	v = v.replace /\s+/g, '~`~'
-	parts = v.split '~`~'
-	for part in parts
-		if not (thirds = ///^ ([^=:]*) (=|:) (.*) $///.exec part) then continue
-		[d, name, sep, value] = thirds
-		if not styleOnly and sep == '=' 
-			if name == 'in'
-				attrs.id = value
-				attrs.name = value
-			else
-				if (aa = attrAliases[name]) then name = aa
-				attrs[name] = whiteSpace value
-		if sep == ':' 
-			if (sva = styleValueAliases[part]) then [name, value] = sva.split ':'
-			else 
-				if (sa = styleAliases[name]) then name = sa
-				if name not in ['z-index','opacity'] and 
-					/^(-|\+)?(\d|\.)+$/.test value then value = value + 'px'
-				else value = whiteSpace value 
-			styles[name] = value
-	style = ("#{k}:#{v}" for k, v of styles).join '; '
-	if styleOnly then return style
-	if style then attrs['style'] = style
-	attrs
-	
-expandStyle = (v) ->
-	s = ''
-	while parts = v.match(///^ ([^{]*) \{ ([^}]*) \} ([\s\S]*) $///)
-		[x, pfx, style, v] = parts
-		s += pfx + '{' + expandAttrs(style, true) + '}'
-	s + v
+  renderAttr: (name, value) -> 
+    if not value? or value is false
+      return ''
+    
+    if value is true
+      value = name
 
-extendX = (newSpecStrs = {}, oldSpecStrs = {}) -> 
-	for key, newSpecStr of newSpecStrs
-		if not (oldSpecStr = oldSpecStrs[key]) then oldSpecStrs[key] = newSpecStr; continue
-		specsObj = {}
-		addSpecStr = (specStr) ->
-			for spec in (specStr.replace(/\s+/g, '~`~').split '~`~')
-				if not (specParts = ///^ ([^=:]*(=|:)) (.*) $///.exec spec) then continue
-				specsObj[specParts[1]] = specParts[3]
-			null
-		addSpecStr oldSpecStr
-		addSpecStr newSpecStr
-		oldSpecStrs[key] = (nameSep + val for nameSep, val of specsObj).join ' '
-	oldSpecStrs
+    return " #{name}=#{@quote value.toString()}"
 
-# -------------------------------- main drykup code ------------------------------
+  attrOrder: ['id', 'class']
+  renderAttrs: (obj) -> 
+    result = ''
+    
+    # render explicitly ordered attributes first
+    for name in @attrOrder when name of obj
+      result += @renderAttr name, obj[name]
+      delete obj[name]
 
-class Drykup 
-	constructor: (opts = {}) -> 
-		@indent  = opts.indent  ? ''
-		@htmlOut = opts.htmlOut ? ''
-		@expand  = opts.expand  ? false
-		
-	resetHtml: (html = '') -> @htmlOut = html
-	
-	defineGlobalTagFuncs: -> if window then for name, func of @ then window[name] = func
-	
-	addText: (s) -> if s then @htmlOut += @indent + s + '\n'; ''
-	
-	attrStr: (obj) ->
-		attrstr = ''
-		for name, val of obj
-			if @expand and name is 'x' then attrstr += @attrStr expandAttrs val
-			else 
-				vstr = val.toString()
-				q = (if vstr.indexOf('"') isnt -1 then "'" else '"')
-				attrstr += ' ' + name + '=' + q +  vstr + q
-		attrstr
+    # then unordered attrs 
+    for name, value of obj
+      result += @renderAttr name, value
 
-	normalTag: (tagName, args) ->
-		attrstr = innertext = ''
-		func = null
-		for arg in args
-			switch typeof arg
-				when 'undefined','null' then continue
-				when 'string', 'number' then innertext = arg
-				when 'function' 		then func = arg
-				when 'object'   		then attrstr += @attrStr arg
-				else console.log 'DryKup: invalid argument, tag ' + tagName + ', ' + arg.toString()
-		@htmlOut += @indent + '<' + tagName + attrstr + '>'
-		if func and tagName isnt 'textarea'
-			@htmlOut += '\n'
-			@indent += '  '
-			@addText innertext
-			func?()
-			@indent = @indent[0..-3]
-			@addText '</' + tagName + '>'
-		else 
-			@htmlOut += innertext + '</' + tagName + '>' + '\n'
+    return result
 
-	selfClosingTag: (tagName, args) ->
-		attrstr = ''
-		for arg in args
-			if not arg? then continue
-			if typeof arg is 'object' then attrstr += @attrStr arg
-			else console.log 'DryKup: invalid argument, tag ' + tagName + ', ' + arg.toString()
-		@addText '<' + tagName + attrstr + ' />' + '\n'
+  renderContents: (contents) ->
+    if not contents?
+      return
+    else if typeof contents is 'function'
+      contents.call @
+    else
+      @text contents
 
-	styleFunc: (str) ->
-		if typeof str isnt 'string'
-#			console.log 'DryKup: invalid argument, tag style, ' + str.toString()
-			return
-		@addText '<style>' + (if @expand then expandStyle str else str)+'\n' + @indent + '</style>'
+  isSelector: (string) ->
+    string.length > 1 and string[0] in ['#', '.']  
 
-	extendX: (newSpecStrs = {}, oldSpecStrs = {}) -> 
-    	for key, newSpecStr of newSpecStrs
-    		if not (oldSpecStr = oldSpecStrs[key]) then oldSpecStrs[key] = newSpecStr; continue
-    		specsObj = {}
-    		addSpecStr = (specStr) ->
-    			for spec in (specStr.replace(/\s+/g, '~`~').split '~`~')
-    				if not (specParts = ///^ ([^=:]*(=|:)) (.*) $///.exec spec) then continue
-    				specsObj[specParts[1]] = specParts[3]
-    			null
-    		addSpecStr oldSpecStr
-    		addSpecStr newSpecStr
-    		oldSpecStrs[key] = (nameSep + val for nameSep, val of specsObj).join ' '
-    	oldSpecStrs
+  parseSelector: (selector) ->
+    id = null
+    classes = []
+    for token in selector.split '.'
+      if id
+        classes.push token
+      else
+        [klass, id] = token.split '#'
+        classes.push token unless klass is ''
+    return {id, classes}
+  
+  normalizeArgs: (args) ->
+    attrs = {}
+    selector = null
+    contents = null
+    for arg, index in args
+      switch typeof arg
+        when 'string'
+          if index is 0 and @isSelector(arg)
+            selector = @parseSelector(arg)
+          else
+            contents = arg
+        when 'function', 'number', 'boolean'
+          contents = arg
+        when 'object'
+          attrs = arg
+        else  
+          console.log "DryKup: invalid argument: #{arg.toString()}"
 
-drykup = (opts) -> 
-	dk = new Drykup(opts)
-	
-	dk.doctype 		= (type) -> dk.addText doctypes[type]
-	dk.text    		=    (s) -> dk.addText s
-	dk.coffeescript =   	 -> dk.addText 'coffeescript tag not implemented'
-	dk.style 		=    (s) -> dk.styleFunc s
-	
-	for tagName in merge_elements 'regular', 'obsolete'
-		do (tagName) ->
-			dk[tagName] = (args...) -> dk.normalTag tagName, args
-			
-	for tagName in merge_elements 'void', 'obsolete_void'
-		do (tagName) ->
-        	dk[tagName] = (args...) -> dk.selfClosingTag tagName, args
-	dk
-	
-drykup.extendX = extendX
+    if selector?
+      {id, classes} = selector
+      attrs.id = id if id?
+      attrs.class = classes.join(' ') if classes?.length
+
+    return {attrs, contents}
+
+  tag: (tagName, args...) ->
+    {attrs, contents} = @normalizeArgs args
+    @text "<#{tagName}#{@renderAttrs attrs}>"
+    @renderContents contents
+    @text "</#{tagName}>"
+
+  selfClosingTag: (tag, args...) ->
+    {attrs, contents} = @normalizeArgs args
+    if contents
+      throw new Error "DryKup: <#{tag}/> must not have content.  Attempted to nest #{content}"
+    @text "<#{tag}#{@renderAttrs attrs} />"
+
+  coffeescript: ->
+    throw new Error 'DryKup: coffeescript tag not implemented'
+
+  comment: (text) ->
+    @text "<!--#{text}-->"
+
+  doctype: (type=5) ->
+    @text doctypes[type]
+
+  ie: (condition, contents) ->
+    @text "<!--[if #{condition}]>"
+    @renderContents contents
+    @text "<![endif]-->"
+
+  text: (s) ->
+    unless @htmlOut?
+      throw new Error("DryKup: can't call a tag function outside a rendering context")
+    @htmlOut += s?.toString() or ''
+
+  #
+  # Filters
+  # return strings instead of appending to buffer
+  #
+  escape: (text) ->
+    text.toString().replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  quote: (value) ->
+    q = (if '"' in value then "'" else '"')
+    return q + value + q
+
+  #
+  # Binding
+  #
+  tags: ->
+    bound = {}
+    for method in 'cede coffeescript comment doctype escape ie render renderable tag text'.split(' ') 
+      do (method) =>
+        bound[method] = (args...) => @[method].apply @, args
+
+    for tagName in merge_elements 'regular', 'obsolete'
+      do (tagName) =>
+        bound[tagName] = (args...) => @tag tagName, args...
+        
+    for tagName in merge_elements 'void', 'obsolete_void'
+      do (tagName) =>
+        bound[tagName] = (args...) => @selfClosingTag tagName, args...
+
+    return bound
 
 if module?.exports
-	module.exports = drykup
+  module.exports = DryKup
 else 
-	window.drykup = drykup
-	
+  window.drykup = DryKup
+  
