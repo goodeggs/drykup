@@ -1,5 +1,5 @@
 expect = require 'expect.js'
-{doctype, html, head, meta, link, style, title, script, body,
+{renderable, doctype, html, head, meta, link, style, title, script, body,
 coffeescript, header, section, nav, footer, h1, h2, ul, li, a, p} = require '../tags'
 
 describe 'coffeekup.org example', ->
@@ -11,7 +11,7 @@ describe 'coffeekup.org example', ->
     max = 12
     shoutify = (s) -> s.toUpperCase() + '!'
 
-    template = ->
+    template = renderable ->
       doctype 5
       html ->
         head ->

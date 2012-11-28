@@ -59,24 +59,36 @@ class DryKup
   constructor: ->
     @htmlOut = null
     
-  resetBuffer: (html = null) -> 
+  resetBuffer: (html=null) -> 
     previous = @htmlOut
     @htmlOut = html
     return previous
-  
-  ensureBuffer: (template) ->
-    if @htmlOut is null
-      @htmlOut = ''
-      template()
-      return @resetBuffer()
-    else
-      template()
 
-  stashBuffer: (template) ->
-    previous = @resetBuffer()
-    result = template()
-    @resetBuffer(previous)
+  render: (template, args...) ->
+    previous = @resetBuffer('')
+    try
+      template(args...)
+    finally
+      result = @resetBuffer previous
     return result
+
+  # alias render for coffeecup compatibility
+  cede: (args...) -> @render(args...)
+  
+  # Template function decorator to render the argument template
+  # to a string when it's called outside any other template
+  renderable: (template) ->
+    drykup = @
+    return (args...) ->
+      if drykup.htmlOut is null
+        drykup.htmlOut = ''
+        try
+          template.apply @, args
+        finally
+          result = drykup.resetBuffer()
+        return result
+      else
+        template.apply @, args
 
   renderAttr: (name, value) -> 
     if not value? or value is false
@@ -108,7 +120,7 @@ class DryKup
     else if typeof contents is 'function'
       contents.call @
     else
-      @htmlOut += contents.toString()
+      @text contents
 
   isSelector: (string) ->
     string.length > 1 and string[0] in ['#', '.']  
@@ -151,24 +163,15 @@ class DryKup
 
   tag: (tagName, args...) ->
     {attrs, contents} = @normalizeArgs args
-    @ensureBuffer =>
-      @text "<#{tagName}#{@renderAttrs attrs}>"
-      @renderContents contents
-      @text "</#{tagName}>"
+    @text "<#{tagName}#{@renderAttrs attrs}>"
+    @renderContents contents
+    @text "</#{tagName}>"
 
   selfClosingTag: (tag, args...) ->
     {attrs, contents} = @normalizeArgs args
     if contents
       throw new Error "DryKup: <#{tag}/> must not have content.  Attempted to nest #{content}"
     @text "<#{tag}#{@renderAttrs attrs} />"
-
-  # Wraps a function to collect all nested tag calls
-  # while maintaining context and arguments
-  fragment: (template) ->
-    drykup = @
-    return (args...) ->
-      drykup.ensureBuffer =>
-        template.apply @, args
 
   coffeescript: ->
     throw new Error 'DryKup: coffeescript tag not implemented'
@@ -180,24 +183,19 @@ class DryKup
     @text doctypes[type]
 
   ie: (condition, contents) ->
-    @ensureBuffer =>
-      @text "<!--[if #{condition}]>"
-      @renderContents contents
-      @text "<![endif]-->"
+    @text "<!--[if #{condition}]>"
+    @renderContents contents
+    @text "<![endif]-->"
 
   text: (s) ->
-    @ensureBuffer =>
-      if s 
-        @htmlOut += s
+    unless @htmlOut?
+      throw new Error("DryKup: can't call a tag function outside a rendering context")
+    @htmlOut += s?.toString() or ''
 
   #
   # Filters
   # return strings instead of appending to buffer
   #
-  cede: (template, args...) ->
-    @stashBuffer ->
-      template(args...)
-
   escape: (text) ->
     text.toString().replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -214,7 +212,7 @@ class DryKup
   #
   tags: ->
     bound = {}
-    for method in 'cede coffeescript comment doctype escape fragment ie tag text'.split(' ') 
+    for method in 'cede coffeescript comment doctype escape ie render renderable tag text'.split(' ') 
       do (method) =>
         bound[method] = (args...) => @[method].apply @, args
 

@@ -1,5 +1,5 @@
 expect = require 'expect.js'
-{div, p} = require '../tags'
+{render, div, p} = require '../tags'
 
 describe 'nesting templates', ->
   it 'renders nested template in the same output', ->
@@ -14,4 +14,4 @@ describe 'nesting templates', ->
       div ->
         nameHelper user
 
-    expect(template user).to.equal '<div><p>Huevo Bueno</p></div>'
+    expect(render template, user).to.equal '<div><p>Huevo Bueno</p></div>'

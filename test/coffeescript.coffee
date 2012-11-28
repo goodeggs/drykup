@@ -1,9 +1,9 @@
 expect = require 'expect.js'
-{coffeescript} = require '../tags'
+{renderable, coffeescript} = require '../tags'
 
 describe 'coffeescript', ->
   it 'is not implemented', ->
-    template = -> coffeescript -> alert 'hi'
+    template = renderable -> coffeescript -> alert 'hi'
     expect(-> template()).to.throwException /coffeescript tag not implemented/
 
   # it 'function should render', ->

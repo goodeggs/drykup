@@ -1,5 +1,5 @@
 expect = require 'expect.js'
-{script} = require '../tags'
+{render, script} = require '../tags'
 
 describe 'HereDocs', ->
   it 'preserves line breaks', ->
@@ -8,4 +8,4 @@ describe 'HereDocs', ->
         alert('test');
       });
     """
-    expect(template()).to.equal '<script>$(document).ready(function(){\n  alert(\'test\');\n});</script>'
+    expect(render template).to.equal '<script>$(document).ready(function(){\n  alert(\'test\');\n});</script>'

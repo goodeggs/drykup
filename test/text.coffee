@@ -1,6 +1,6 @@
 expect = require 'expect.js'
-{text} = require '../tags'
+{renderable, text} = require '../tags'
 
 describe 'text', ->
   it 'renders text verbatim', ->
-    expect(text 'foobar').to.equal 'foobar'
+    expect(renderable(text) 'foobar').to.equal 'foobar'

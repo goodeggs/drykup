@@ -1,11 +1,11 @@
 expect = require 'expect.js'
-{fragment, head, title, body} = require '../tags'
+{render, head, title, body} = require '../tags'
 
 describe 'hello world', ->
   it 'renders am html string from drykup tag functions', ->
-    template = fragment ->
+    template = ->
       head ->                     
       	title 'Hello World'
       body ->
 
-    expect(template()).to.contain '<title>Hello World</title>'
+    expect(render template).to.contain '<title>Hello World</title>'
